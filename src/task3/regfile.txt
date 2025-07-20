@@ -1,0 +1,85 @@
+`timescale 1ns/1ps
+module regfile(
+    input [3:0] dstE,      // 写入端口E的目标寄存器ID
+    input [31:0] valE,     // 写入端口E的值
+    input [3:0] dstM,      // 写入端口M的目标寄存器ID
+    input [31:0] valM,     // 写入端口M的值
+    input [2:0] rAddr1,    // 读取地址1（rs1）
+    input [2:0] rAddr2,    // 读取地址2（rs2）
+    output reg [31:0] rData1,  // 读取数据1（rs1的值）
+    output reg [31:0] rData2,  // 读取数据2（rs2的值）
+    input reset,           // 同步复位信号
+    input clock,           // 时钟信号
+    output [31:0] r0,      // 寄存器%r0
+    output [31:0] r1,      // 寄存器%r1
+    output [31:0] r2,      // 寄存器%r2
+    output [31:0] r3,      // 寄存器%r3
+    output [31:0] r4,      // 寄存器%r4
+    output [31:0] r5,      // 寄存器%r5
+    output [31:0] r6,      // 寄存器%r6
+    output [31:0] r7       // 寄存器%r7
+);
+
+// 寄存器定义
+reg [31:0] registers [0:7]; // 8个寄存器 %r0-%r7
+
+// 写使能信号
+wire [7:0] weM;
+
+// 生成写使能信号
+assign weM[0] = (dstM[2:0] == 3'b000) ? 1'b1 : 1'b0;
+assign weM[1] = (dstM[2:0] == 3'b001) ? 1'b1 : 1'b0;
+assign weM[2] = (dstM[2:0] == 3'b010) ? 1'b1 : 1'b0;
+assign weM[3] = (dstM[2:0] == 3'b011) ? 1'b1 : 1'b0;
+assign weM[4] = (dstM[2:0] == 3'b100) ? 1'b1 : 1'b0;
+assign weM[5] = (dstM[2:0] == 3'b101) ? 1'b1 : 1'b0;
+assign weM[6] = (dstM[2:0] == 3'b110) ? 1'b1 : 1'b0;
+assign weM[7] = (dstM[2:0] == 3'b111) ? 1'b1 : 1'b0;
+
+// 写操作（保持不变）
+always @(posedge clock or posedge reset) begin
+    if (reset) begin
+        registers[0] <= 32'b0;
+        registers[1] <= 32'b0;
+        registers[2] <= 32'b0;
+        registers[3] <= 32'b0;
+        registers[4] <= 32'b0;
+        registers[5] <= 32'b0;
+        registers[6] <= 32'b0;
+        registers[7] <= 32'b0;
+    end
+    else begin
+        if (weM[0]) registers[0] <= valM;
+        if (weM[1]) registers[1] <= valM;
+        if (weM[2]) registers[2] <= valM;
+        if (weM[3]) registers[3] <= valM;
+        if (weM[4]) registers[4] <= valM;
+        if (weM[5]) registers[5] <= valM;
+        if (weM[6]) registers[6] <= valM;
+        if (weM[7]) registers[7] <= valM;
+    end
+end
+
+// 读操作（修改为时序逻辑以避免竞争冒险）
+always @(posedge clock or posedge reset) begin
+    if (reset) begin
+        rData1 <= 32'b0;
+        rData2 <= 32'b0;
+    end
+    else begin
+        rData1 <= (rAddr1 < 8) ? registers[rAddr1] : 32'b0;
+        rData2 <= (rAddr2 < 8) ? registers[rAddr2] : 32'b0;
+    end
+end
+
+// 寄存器值输出（保持不变）
+assign r0 = registers[0];
+assign r1 = registers[1];
+assign r2 = registers[2];
+assign r3 = registers[3];
+assign r4 = registers[4];
+assign r5 = registers[5];
+assign r6 = registers[6];
+assign r7 = registers[7];
+
+endmodule

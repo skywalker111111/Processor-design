@@ -1,0 +1,97 @@
+`timescale 1ns/1ps
+module tb_task2();
+
+    // 时钟和复位信号
+    reg clock;
+    reg reset;
+    
+    // 存储器接口
+    reg [8:0] addr;
+    reg wr;
+    reg [31:0] wdata;
+    reg working;
+    
+    // 处理器输出（寄存器值）
+    wire [31:0] r0, r1, r2, r3, r4, r5, r6, r7;
+    
+    // 实例化处理器
+    processor dut (
+        .clock(clock),
+        .reset(reset),
+        .addr(addr),
+        .wr(wr),
+        .wdata(wdata),
+        .working(working),
+        .r0(r0),
+        .r1(r1),
+        .r2(r2),
+        .r3(r3),
+        .r4(r4),
+        .r5(r5),
+        .r6(r6),
+        .r7(r7)
+    );
+
+    // 时钟生成（50MHz，周期20ns）
+    localparam PERIOD = 20;
+    initial begin
+        clock = 1'b0;
+        forever #(PERIOD/2) clock = ~clock;
+    end
+
+    // 主测试流程
+    initial begin
+        // 初始化信号
+        reset = 1'b1;
+        addr = 9'b0;
+        wr = 1'b0;
+        wdata = 32'b0;
+        working = 1'b0;
+        
+        // 复位（保持2个周期）
+        #(PERIOD*2);
+        reset = 1'b0;
+        
+        // 阶段1：写入4条IRMOV指令（working=0）
+        // 指令1：IRMOV %r0, $22307130102（学号）
+        wr = 1'b1;
+        working = 1'b0;
+        addr = 9'd0;
+        wdata = {4'b0001, 4'b0000, 3'b000, 3'b000, 3'b000, 15'h4AF6}; // 低15位为学号的4AF6
+        #PERIOD;
+        
+        // 指令2：IRMOV %r1, $22307130103（学号+1）
+        addr = 9'd1;
+        wdata = {4'b0001, 4'b0000, 3'b000, 3'b000, 3'b001, 15'h4AF7}; // 低15位+1
+        #PERIOD;
+        
+        // 指令3：IRMOV %r2, $22307130104（学号+2）
+        addr = 9'd2;
+        wdata = {4'b0001, 4'b0000, 3'b000, 3'b000, 3'b010, 15'h4AF8}; // 低15位+2
+        #PERIOD;
+        
+        // 指令4：IRMOV %r3, $22307130105（学号+3）
+        addr = 9'd3;
+        wdata = {4'b0001, 4'b0000, 3'b000, 3'b000, 3'b011, 15'h4AF9}; // 低15位+3
+        #PERIOD;
+        
+        // 阶段2：执行指令（working=1）
+        wr = 1'b0;
+        working = 1'b1;
+        
+        // 监控寄存器值变化
+        $display("Time\t r0\t\t r1\t\t r2\t\t r3\t\t r4-r7");
+        repeat (6) begin
+            #PERIOD;
+            $display("%0t\t %h\t %h\t %h\t %h\t %h %h %h %h", 
+                     $time, r0, r1, r2, r3, r4, r5, r6, r7);
+        end
+    end
+    
+    // 仿真结束
+    initial begin
+        #(PERIOD*10); // 总共运行10个周期（4写+6执行）
+        $finish();
+    end
+
+endmodule
