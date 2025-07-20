@@ -1,0 +1,155 @@
+`timescale 1ns/1ps
+module processor (
+    input clock,
+    input rst_n,
+    input [8:0] addr,
+    input wEn,
+    input [31:0] wDat,
+    input working,
+    output [3:0] icode,
+    output [3:0] ifun,
+    output [2:0] rA,
+    output [2:0] rB,
+    output [2:0] rd,
+    output [14:0] valC,
+    output [31:0] valA,  // 新增：源寄存器A的值
+    output [31:0] valB,  // 新增：源寄存器B的值
+    output [31:0] valE,  // 新增：ALU运算结果
+    output [31:0] aluA,
+    output [31:0] aluB,
+    output [31:0] r0,
+    output [31:0] r1,
+    output [31:0] r2,
+    output [31:0] r3,
+    output [31:0] r4,
+    output [31:0] r5,
+    output [31:0] r6,
+    output [31:0] r7
+);
+
+    localparam ZERO_DATA = 32'b0;
+    localparam ZERO_ADDR = 9'b0;
+
+    // RAM接口信号
+    reg [8:0] ram_addr;
+    wire [31:0] instruction;
+    wire rEn;
+    
+    ram u_ram (
+        .clock(clock),
+        .rst_n(rst_n),
+        .addr(ram_addr),
+        .wEn(wEn),
+        .wDat(wDat),
+        .rEn(rEn),
+        .rDat(instruction)
+    );
+
+    // PC寄存器
+    reg [8:0] pc;
+
+    // RAM地址选择逻辑
+    always @(*) begin
+        if (working == 1'b0 && wEn == 1'b1) 
+            ram_addr = addr;
+        else if (working == 1'b1) 
+            ram_addr = pc;
+        else 
+            ram_addr = ZERO_ADDR;
+    end
+
+    assign rEn = working;
+
+    // PC更新逻辑
+    always @(posedge clock or negedge rst_n) begin
+        if (!rst_n) 
+            pc <= ZERO_ADDR;
+        else if (working) 
+            pc <= pc + 9'b1;
+        else 
+            pc <= ZERO_ADDR;
+    end
+
+    // 指令解析
+    assign icode = instruction[31:28];
+    assign ifun  = instruction[27:24];
+    assign rA    = instruction[23:21];
+    assign rB    = instruction[20:18];
+    assign rd    = instruction[17:15];
+    assign valC  = instruction[14:0];
+
+    // --- 新增ALU逻辑 ---
+    wire [31:0] aluA, aluB;
+    reg [3:0] alufun;
+    //wire [31:0] valE;
+
+  
+    assign aluA = valA;  // 源寄存器A的值
+    assign aluB = (icode == 4'h3 & ifun == 4'h1) ? {17'b0, valC} : valB;  // SLL指令使用立即数
+    always @(*) begin
+        case (icode)
+            4'h2: begin  // icode=2 的情况
+                if (ifun == 4'h0) begin
+                    alufun = 4'h0;  // 加法指令
+                end else if (ifun == 4'h1) begin
+                    alufun = 4'h1;  // 减法指令
+                end else begin
+                    alufun = 4'h0;  // 默认情况
+                end
+            end
+            4'h3: begin  // icode=3 的情况
+                if (ifun == 4'h0) begin
+                    alufun = 4'h2;  // OR 指令
+                end else if (ifun == 4'h1) begin
+                    alufun = 4'h3;  // 左移指令
+                end else begin
+                    alufun = 4'h0;  // 默认情况
+                end
+            end
+            default: begin
+                alufun = 4'h0;  // 默认的 alufun 值
+            end
+        endcase
+    end
+    // ALU实例化
+    alu u_alu (
+        .aluA(aluA),
+        .aluB(aluB),
+        .alufun(alufun),
+        .valE(valE)
+    );
+
+    // --- 寄存器堆写回逻辑 ---
+    wire [3:0] dstM, dstE;
+    wire [31:0] valM;
+
+    // IRMOV指令写回
+    assign valM = (icode == 4'h1) ? {17'b0, valC} : 32'b0;
+    assign dstM = (icode == 4'h1) ? {1'b0, rd} : 4'hf;
+
+    // ALU指令写回
+    assign dstE = (icode >= 4'h2 && icode <= 4'h3) ? {1'b0, rd} : 4'hf;
+
+    // 寄存器堆实例化
+    regfile u_regfile (
+        .dstE(dstE),         // ALU目标寄存器
+        .valE(valE),         // ALU计算结果
+        .dstM(dstM),         // IRMOV目标寄存器
+        .valM(valM),         // IRMOV立即数
+        .rAddr1(rA),         // 源寄存器A地址
+        .rAddr2(rB),         // 源寄存器B地址
+        .rData1(valA),       // 源寄存器A的值
+        .rData2(valB),       // 源寄存器B的值
+        .reset(~rst_n),
+        .clock(clock),
+        .r0(r0),
+        .r1(r1),
+        .r2(r2),
+        .r3(r3),
+        .r4(r4),
+        .r5(r5),
+        .r6(r6),
+        .r7(r7)
+    );
+
+endmodule

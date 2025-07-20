@@ -1,0 +1,121 @@
+`timescale 1ns/1ps
+module tb ();
+    
+    reg clock;         
+    reg rst_n;        
+    reg [8:0] addr;     
+    reg wEn;           
+    reg [31:0] wDat;    
+    reg working;       
+    wire [31:0] r0;     
+    wire [31:0] r1;     
+    wire [31:0] r2;     
+    wire [31:0] r3;     
+    wire [31:0] r4;     
+    wire [31:0] r5;     
+    wire [31:0] r6;     
+    wire [31:0] r7;     
+    
+    // 新增：译码输出
+    wire [3:0] icode;
+    wire [3:0] ifun;
+    wire [2:0] rA;
+    wire [2:0] rB;
+    wire [2:0] rd;
+    wire [14:0] valC;
+    wire [31:0] valA;
+    wire [31:0] valB;
+
+    localparam PERIOD = 20;
+    localparam ZERO_DATA = 32'b0;
+    localparam ZERO_ADDR = 9'b0;
+
+    // 实例化处理器（修改：添加译码端口）
+    processor dut (
+        .clock(clock),             
+        .rst_n(rst_n),             
+        .addr(addr),        
+        .wEn(wEn),               
+        .wDat(wDat),       
+        .working(working),           
+        .r0(r0),       
+        .r1(r1),        
+        .r2(r2),          
+        .r3(r3),          
+        .r4(r4),          
+        .r5(r5),          
+        .r6(r6),          
+        .r7(r7),
+        
+        // 新增：译码端口连接
+        .icode(icode),
+        .ifun(ifun),
+        .rA(rA),
+        .rB(rB),
+        .rd(rd),
+        .valC(valC),
+        .valA(valA),
+        .valB(valB)
+    );
+
+    // 时钟生成（保持不变）
+    initial begin
+        clock = 1'b0;
+        forever #(PERIOD / 2) clock = ~clock;   
+    end
+
+    // 复位逻辑（保持不变）
+    initial begin
+        rst_n = 1'b0;
+        #(PERIOD * 2) rst_n = 1'b1;
+    end
+    
+    // 测试激励（修改：写入任务3要求的指令）
+    initial begin
+        // 初始化
+        addr <= ZERO_ADDR;
+        wEn <= 1'b0;
+        wDat <= ZERO_DATA;
+        working <= 1'b0;
+        #(PERIOD * 2);
+
+        // 写入任务3要求的指令
+        // 1. IRMOV %r5, $12
+        addr <= 9'd0;
+        wEn <= 1'b1;
+        wDat <= 32'b0001_0000_101_000_000_00000000001100; 
+        #PERIOD;
+
+        // 2. ADD %r1, %r2, %r3
+        addr <= 9'd1;
+        wDat <= 32'b0010_0001_010_011_000_00000000000000; 
+        #PERIOD;
+
+        // 3. SLL %r4, %r5, $3
+        addr <= 9'd2;
+        wDat <= 32'b0011_0100_101_000_000_000000000000011; 
+        #PERIOD;
+
+        // 4. SUB %r0, %r6, %r7
+        addr <= 9'd3;
+        wDat <= 32'b0010_0000_110_111_000_00000000000000; 
+        #PERIOD;
+
+        // 启动处理器
+        addr <= ZERO_ADDR;
+        wEn <= 1'b0;
+        wDat <= ZERO_DATA;
+        working <= 1'b1;
+
+        // 监控译码输出
+        $monitor("PC=%0d | icode=%b | ifun=%b | rA=%b | rB=%b | rd=%b | valC=%d | valA=%d | valB=%d",
+                 dut.pc, icode, ifun, rA, rB, rd, valC, valA, valB);
+
+        // 等待几个周期观察结果
+        #(PERIOD * 8);
+
+        // 结束仿真
+        $finish();
+    end
+
+endmodule

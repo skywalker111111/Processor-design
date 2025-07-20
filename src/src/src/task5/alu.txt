@@ -1,0 +1,17 @@
+`timescale 1ns/1ps
+module alu(
+    input [31:0] aluA,   // 操作数A
+    input [31:0] aluB,   // 操作数B
+    input [3:0] alufun,  // 运算功能码
+    output reg [31:0] valE  // 运算结果
+);
+    always @(*) begin
+        case (alufun)
+            4'h0: valE = aluA + aluB;    // 加法
+            4'h1: valE = aluA - aluB;    // 减法
+            4'h2: valE = aluA | aluB;    // 逻辑或
+            4'h3: valE = aluA << aluB[4:0];   // 逻辑左移
+            default: valE = 32'b0;       // 无效功能码
+        endcase
+    end
+endmodule
